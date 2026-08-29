@@ -14,6 +14,7 @@ asarUnpack:
   - resources/**
 win:
   executableName: notes
+  icon: build/icon.ico
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -30,6 +31,7 @@ mac:
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
+  icon: build/icon.png
   target:
     - tar.xz
   maintainer: notes

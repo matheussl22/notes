@@ -1,7 +1,8 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import iconPng from '../../resources/icon.png?asset'
+import iconIco from '../../resources/icon.ico?asset'
 import {
   createNote,
   createProject,
@@ -30,7 +31,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     title: 'Notes',
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon: process.platform === 'win32' ? iconIco : iconPng,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
