@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="220" viewBox="0 0 880 220" role="img" aria-label="Notes">
+  <rect width="880" height="220" fill="#f5f4f1"/>
+  <rect x="0" y="0" width="248" height="220" fill="#f0eee8"/>
+  <rect x="247" y="0" width="1" height="220" fill="#e6e3dd"/>
+  <text x="28" y="42" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#77746c">Notes</text>
+  <rect x="20" y="58" width="208" height="26" rx="7" fill="#ebe8e2"/>
+  <text x="32" y="76" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" fill="#77746c">Search</text>
+  <rect x="20" y="100" width="208" height="28" rx="7" fill="#ddd8ce"/>
+  <text x="32" y="119" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1c1b19">Project</text>
+  <text x="44" y="150" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#413e38">Untitled</text>
+  <text x="300" y="64" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" font-weight="600" fill="#1c1b19">Write locally.</text>
+  <text x="300" y="104" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" fill="#77746c">Projects, notes, and files. No cloud.</text>
+  <rect x="300" y="132" width="10" height="10" rx="2" fill="none" stroke="#14665c" stroke-width="1.5"/>
+  <path d="M302.4 137.2 304.2 139 307.8 135" fill="none" stroke="#14665c" stroke-width="1.5" stroke-linecap="round"/>
+  <text x="318" y="142" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" fill="#26251f">Check a task. Keep the memory.</text>
+</svg>
