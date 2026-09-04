@@ -1,0 +1,830 @@
+/*
+ * Editor de texto: toolbar, popovers, documento (.doc) e nós do Tiptap
+ * (tabelas, imagens, código, citação, checklist), menus flutuantes e menu "/".
+ */
+
+/* Paleta de cor do texto (gravada no documento como var(--cN)). */
+:root {
+  --c1: #b3261e;
+  --c2: #b25c00;
+  --c3: #3d7a1e;
+  --c4: #1f5fa8;
+  --c5: #6b3fa0;
+  --c6: #77746c;
+}
+
+:root[data-theme='night'] {
+  --c1: #f08a84;
+  --c2: #e6a15c;
+  --c3: #8fcf6f;
+  --c4: #7fb3ec;
+  --c5: #b79be0;
+  --c6: #a6a29a;
+}
+
+.editor {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 280px;
+  margin-top: 12px;
+}
+
+/* o EditorContent é o segundo filho; ocupa o que sobrar */
+.editor > .editor-content,
+.editor > div:has(> .doc) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ---------- toolbar ---------- */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 12px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.toolbar button,
+.bubble button,
+.img-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-soft);
+  transition:
+    background 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.toolbar button:hover,
+.bubble button:hover,
+.img-bar button:hover,
+.toolbar button.is-open {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.toolbar button.is-on,
+.bubble button.is-on,
+.img-bar button.is-on {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.toolbar button:disabled,
+.bubble button:disabled {
+  color: var(--line-strong);
+  background: transparent;
+  cursor: default;
+}
+
+.toolbar button svg,
+.bubble button svg {
+  display: block;
+  flex: none;
+}
+
+.toolbar .sep,
+.bubble .sep,
+.img-bar .sep {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+/* dropdown de estilo do bloco e botão "+ Inserir": texto + ícone */
+.toolbar .tb-select,
+.toolbar .tb-insert {
+  width: auto;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.toolbar .tb-select {
+  min-width: 84px;
+  justify-content: space-between;
+}
+
+.toolbar .tb-insert {
+  padding-right: 8px;
+}
+
+/* indicador de cor sob o ícone "A" */
+.color-ind {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-ind::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  left: 2px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--swatch, transparent);
+}
+
+/* ---------- popovers da toolbar ---------- */
+.tb-drop {
+  position: relative;
+  display: inline-flex;
+}
+
+.tb-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+}
+
+/* o bubble menu fica acima do texto; o popover abre para cima */
+.bubble .tb-pop {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.tb-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 196px;
+}
+
+.tb-menu button,
+.toolbar .tb-menu button {
+  width: 100%;
+  height: 28px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.tb-menu button svg {
+  color: var(--muted);
+}
+
+.tb-menu button.is-on svg,
+.tb-menu button:hover svg {
+  color: inherit;
+}
+
+.tb-menu kbd {
+  margin-left: auto;
+  padding-left: 12px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tb-row {
+  display: flex;
+  gap: 2px;
+}
+
+/* paleta: 6 cores + "sem cor" */
+.palette {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  gap: 4px;
+  padding: 2px;
+}
+
+.palette .swatch,
+.toolbar .palette .swatch,
+.bubble .palette .swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--swatch);
+  color: var(--muted);
+}
+
+.palette .swatch:hover {
+  border-color: var(--line-strong);
+  background: var(--swatch);
+}
+
+.palette .swatch.is-on {
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 3px var(--accent);
+  background: var(--swatch);
+}
+
+.palette .swatch-none,
+.toolbar .palette .swatch-none,
+.bubble .palette .swatch-none {
+  background: transparent;
+}
+
+/* ---------- documento ---------- */
+.doc {
+  flex: 1;
+  max-width: none;
+  min-height: 200px;
+  padding-bottom: 40px;
+  outline: none;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.7;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.doc.resize-cursor {
+  cursor: col-resize;
+}
+
+.doc h1,
+.doc h2,
+.doc h3 {
+  margin: 22px 0 6px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.doc h1 {
+  font-size: 24px;
+}
+
+.doc h2 {
+  font-size: 20px;
+}
+
+.doc h3 {
+  font-size: 16px;
+}
+
+.doc > :first-child {
+  margin-top: 0;
+}
+
+.doc p {
+  margin: 0 0 6px;
+}
+
+.doc ul,
+.doc ol {
+  margin: 0 0 6px;
+  padding-left: 24px;
+}
+
+.doc li > p {
+  margin-bottom: 2px;
+}
+
+.doc li > ul,
+.doc li > ol {
+  margin-bottom: 0;
+}
+
+/* checklist */
+.doc ul[data-type='taskList'] {
+  padding-left: 0;
+  list-style: none;
+}
+
+.doc ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.doc ul[data-type='taskList'] li > label {
+  flex: none;
+  display: grid;
+  place-items: center;
+  height: calc(15px * 1.7);
+  margin: 0;
+  user-select: none;
+}
+
+.doc ul[data-type='taskList'] li > label input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.doc ul[data-type='taskList'] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.doc ul[data-type='taskList'] li[data-checked='true'] > div > p {
+  color: var(--muted);
+}
+
+/* marcas inline */
+.doc a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  text-underline-offset: 2px;
+}
+
+.doc a:hover {
+  color: var(--accent-ink);
+  text-decoration-color: currentColor;
+}
+
+.doc code {
+  padding: 1px 5px;
+  border-radius: var(--r-sm);
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.doc mark {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--highlight);
+  color: inherit;
+}
+
+/* bloco de código (node view: .code-block > input + pre > code) */
+.doc .code-block,
+.doc pre {
+  position: relative;
+  margin: 0 0 10px;
+}
+
+.doc pre {
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+
+.doc pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+  white-space: pre-wrap;
+}
+
+.code-lang {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 1;
+  width: 88px;
+  height: 18px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.code-block:hover .code-lang,
+.code-block.has-lang .code-lang,
+.code-lang:focus {
+  opacity: 1;
+}
+
+.code-lang:focus {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.code-lang::placeholder {
+  color: var(--muted);
+}
+
+/* citação */
+.doc blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--text-soft);
+}
+
+.doc blockquote > p:last-child {
+  margin-bottom: 0;
+}
+
+/* divisor */
+.doc hr {
+  height: 1px;
+  margin: 16px 0;
+  border: 0;
+  background: var(--line);
+}
+
+.doc hr.ProseMirror-selectednode {
+  background: var(--accent);
+}
+
+/* ---------- tabelas (estilo Jira) ---------- */
+.doc .tableWrapper {
+  margin: 4px 0 12px;
+  overflow-x: auto;
+}
+
+.doc table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.doc th,
+.doc td {
+  position: relative;
+  min-width: 60px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.doc th {
+  background: var(--code-bg);
+  font-weight: 600;
+}
+
+.doc th > *,
+.doc td > * {
+  margin: 0;
+}
+
+.doc th > * + *,
+.doc td > * + * {
+  margin-top: 4px;
+}
+
+.doc td ul,
+.doc td ol,
+.doc th ul,
+.doc th ol {
+  padding-left: 18px;
+}
+
+.doc .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: var(--table-sel);
+  pointer-events: none;
+}
+
+.doc .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -1px;
+  bottom: 0;
+  z-index: 3;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.doc table.ProseMirror-selectednode {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ---------- imagens ---------- */
+.doc img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--r-sm);
+}
+
+.doc img[data-align='center'] {
+  margin: 0 auto;
+}
+
+.doc img[data-align='right'] {
+  margin-left: auto;
+}
+
+/* node view: wrapper flex alinha; a caixa encolhe até a imagem */
+.doc .img-view {
+  display: flex;
+  justify-content: flex-start;
+  margin: 4px 0 10px;
+}
+
+.doc .img-view[data-align='center'] {
+  justify-content: center;
+}
+
+.doc .img-view[data-align='right'] {
+  justify-content: flex-end;
+}
+
+.doc .img-box {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  flex: none;
+}
+
+.doc .img-box img {
+  margin: 0;
+}
+
+.doc .img-view.is-selected .img-box img {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.doc .img-view.is-resizing {
+  user-select: none;
+}
+
+.img-handle {
+  position: absolute;
+  z-index: 3;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--panel);
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.img-handle.nw {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+
+.img-handle.ne {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+
+.img-handle.sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+
+.img-handle.se {
+  right: -4px;
+  bottom: -4px;
+  cursor: nwse-resize;
+}
+
+.img-bar {
+  position: absolute;
+  bottom: -34px;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.img-bar button {
+  width: 24px;
+  height: 24px;
+}
+
+/* imagens dentro de célula ficam compactas */
+.doc td .img-view,
+.doc th .img-view {
+  margin: 0;
+}
+
+.doc td .img-box,
+.doc th .img-box,
+.doc td img,
+.doc th img {
+  max-width: 100%;
+}
+
+/* ---------- menus flutuantes (seleção e tabela) ---------- */
+.bubble {
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  white-space: nowrap;
+}
+
+.bubble-table button {
+  width: 24px;
+  height: 24px;
+}
+
+.bubble button.is-danger:hover,
+.img-bar button.is-danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* ---------- popover de link ---------- */
+.link-pop {
+  position: absolute;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  color: var(--muted);
+}
+
+.link-pop input {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.link-pop input::placeholder {
+  color: var(--muted);
+}
+
+.link-pop button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.link-pop button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.link-pop button.primary {
+  background: var(--accent);
+  color: var(--panel);
+  font-weight: 500;
+}
+
+.link-pop button.primary:hover {
+  background: var(--accent-ink);
+  color: var(--panel);
+}
+
+/* ---------- menu "/" ---------- */
+.slash-menu {
+  z-index: 40;
+  width: 260px;
+  max-height: 300px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+  overflow-y: auto;
+}
+
+.slash-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+}
+
+.slash-menu button:hover {
+  background: var(--hover);
+}
+
+.slash-menu button.is-selected {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.slash-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text-soft);
+}
+
+.slash-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.slash-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.slash-desc {
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slash-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- placeholder, drop cursor, gap cursor ---------- */
+.doc p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.doc .ProseMirror-gapcursor::after {
+  border-top-color: var(--text);
+}
+
+.doc-skeleton {
+  min-height: 200px;
+}

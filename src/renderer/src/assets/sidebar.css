@@ -1,0 +1,429 @@
+/*
+ * Barra lateral: cabeçalho, busca, árvore de projetos/notas, rodapé e alça de
+ * redimensionar. Grade de 4px; linhas de 24px; texto 13px / 12.5px; nada
+ * colorido além da seleção e da linha de inserção do arrasto.
+ *
+ * Colunas de alinhamento (a partir da borda esquerda):
+ *   14px  texto do cabeçalho e da busca
+ *   24px  nome do projeto (6 nav + 2 linha + 14 chevron + 2)
+ *   38px  título da nota (recuo de 14px em relação ao projeto)
+ */
+aside {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--sidebar);
+  border-right: 1px solid var(--line);
+  user-select: none;
+}
+
+/* cursor do arrasto: com captura de ponteiro, vale o cursor do item de origem */
+aside.is-dragging,
+aside.is-dragging * {
+  cursor: grabbing;
+}
+
+aside.is-dragging.is-drop-invalid,
+aside.is-dragging.is-drop-invalid * {
+  cursor: not-allowed;
+}
+
+.sidebar-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+}
+
+.sidebar-head strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* ---- busca ---------------------------------------------------------------- */
+
+.search {
+  flex: none;
+  width: calc(100% - 12px);
+  height: 26px;
+  margin: 0 6px 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--field);
+  color: var(--text);
+  font-size: 12.5px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search::placeholder {
+  color: var(--muted);
+}
+
+.search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.search:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 0;
+}
+
+.hits {
+  display: flex;
+  flex-direction: column;
+}
+
+.hit {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 8px 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+}
+
+.hit:hover {
+  background: var(--hover);
+}
+
+.hit small {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hit span {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.no-results {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---- árvore --------------------------------------------------------------- */
+
+nav {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 6px 6px;
+  overflow: hidden auto;
+}
+
+.project-block {
+  position: relative;
+}
+
+.project-block.is-dragging {
+  opacity: 0.45;
+}
+
+.project-row {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding-left: 2px;
+}
+
+.chevron {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 14px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.chevron svg {
+  transform: rotate(90deg);
+}
+
+.project-block.is-collapsed .chevron svg {
+  transform: none;
+}
+
+.project-row:hover .chevron,
+.project-block.is-collapsed .chevron,
+.chevron:focus-visible {
+  opacity: 1;
+}
+
+.chevron:hover {
+  color: var(--text);
+}
+
+.project,
+.note,
+.archived-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px 0 2px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 24px;
+  text-align: left;
+  transition: background 120ms ease-out;
+}
+
+.project:focus-visible,
+.note:focus-visible,
+.archived-toggle:focus-visible,
+.hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project {
+  flex: 1;
+  font-weight: 600;
+}
+
+.note {
+  padding-left: 32px;
+  font-size: 12.5px;
+  color: var(--text-soft);
+}
+
+.note.is-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.note.is-untitled {
+  color: var(--muted);
+}
+
+.project:hover,
+.note:hover {
+  background: var(--hover);
+}
+
+.project.is-on,
+.project.is-on:hover,
+.note.is-on,
+.note.is-on:hover {
+  background: var(--sel);
+  color: var(--text);
+}
+
+/* aberta no painel ativo: barra de 2px em --accent; no outro painel: em --line-strong */
+.note.is-on,
+.note.is-on:hover {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.note.is-open {
+  box-shadow: inset 2px 0 0 var(--line-strong);
+}
+
+.note.is-dragging {
+  opacity: 0.45;
+}
+
+/* durante o arrasto o alvo nunca muda de fundo; só a linha de inserção indica o lugar */
+aside.is-dragging .project:not(.is-on):hover,
+aside.is-dragging .note:not(.is-on):hover {
+  background: transparent;
+}
+
+aside.is-dragging .project-row:hover .chevron,
+aside.is-dragging .project-row:hover .add-note-icon {
+  opacity: 0;
+}
+
+aside.is-dragging .project-block.is-collapsed .chevron {
+  opacity: 1;
+}
+
+/* linha de inserção: 2px em --accent, acima ou abaixo do item sob o ponteiro */
+.note.is-drop-before::before,
+.note.is-drop-after::after,
+.project-block.is-drop-before::before,
+.project-block.is-drop-after::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  left: 18px;
+  z-index: 1;
+  height: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.project-block.is-drop-before::before,
+.project-block.is-drop-after::after {
+  left: 2px;
+}
+
+.note.is-drop-before::before,
+.project-block.is-drop-before::before {
+  top: -1px;
+}
+
+.note.is-drop-after::after,
+.project-block.is-drop-after::after {
+  bottom: -1px;
+}
+
+.note-count {
+  flex: none;
+  padding: 0 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.project-row:hover .note-count {
+  display: none;
+}
+
+.add-note-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.add-note-icon:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.project-row:hover .add-note-icon,
+.add-note-icon:focus-visible {
+  opacity: 1;
+}
+
+.archived-toggle {
+  height: 22px;
+  padding-left: 32px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 22px;
+}
+
+.archived-toggle:hover {
+  background: var(--hover);
+  color: var(--text-soft);
+}
+
+/* ---- rodapé --------------------------------------------------------------- */
+
+.sidebar-foot-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.sidebar-foot {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.sidebar-gear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.sidebar-foot:hover,
+.sidebar-gear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* ---- alça de redimensionar ------------------------------------------------- */
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  z-index: 2;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  background: var(--line-strong);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer.is-active::after {
+  opacity: 1;
+}

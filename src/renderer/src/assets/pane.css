@@ -1,0 +1,451 @@
+/*
+ * Conteúdo dos painéis: cabeçalho (breadcrumb + título + menu + toolbar), corpo
+ * rolável, descrição do projeto, lista de notas, menu "···", anexos no rodapé.
+ */
+.pane {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+}
+
+.pane-top {
+  flex: none;
+  padding: 12px var(--pane-x) 0;
+  transition: opacity 120ms ease-out;
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+}
+
+.pane-head .title {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+}
+
+/* breadcrumb: nome do projeto acima do título da nota */
+.crumb {
+  display: inline-block;
+  max-width: 100%;
+  height: 18px;
+  margin: 0 0 2px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 18px;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.crumb:not(.is-static):hover {
+  color: var(--text);
+}
+
+.crumb.is-static {
+  cursor: default;
+}
+
+.title {
+  width: 100%;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 32px;
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.workspace.is-split .title {
+  font-size: 22px;
+}
+
+.title::placeholder {
+  color: var(--line-strong);
+}
+
+/* Corpo: recebe toda a altura restante e rola sozinho. */
+.pane-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 var(--pane-x) 16px;
+  overflow: hidden auto;
+}
+
+.description {
+  flex: none;
+  width: 100%;
+  min-height: 0;
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  resize: none;
+  field-sizing: content;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.description::placeholder {
+  color: var(--muted);
+}
+
+/* Seções do painel de projeto (lista de notas). */
+.pane-section {
+  margin-top: 20px;
+}
+
+.section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
+.section-label,
+.attach-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.text-action {
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+}
+
+.text-action:hover {
+  color: var(--accent-ink);
+}
+
+.pane-muted {
+  margin: 10px 0 0;
+  color: var(--muted);
+}
+
+.note-list ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.note-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  margin: 0 -8px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--r-sm);
+}
+
+.note-list li:hover {
+  background: var(--hover);
+}
+
+.note-row {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.note-row.is-untitled,
+.note-list .is-archived .note-row {
+  color: var(--muted);
+}
+
+.row-tool {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.note-list li:hover .row-tool,
+.row-tool:focus-visible {
+  opacity: 1;
+}
+
+.row-tool:hover {
+  background: var(--sel);
+  color: var(--text);
+}
+
+.archived-block {
+  margin-top: 8px;
+}
+
+.archived-block > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  border-radius: var(--r-sm);
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.archived-block > summary::-webkit-details-marker {
+  display: none;
+}
+
+.archived-block > summary svg {
+  width: 14px;
+  height: 14px;
+  transform: rotate(-90deg);
+  transition: transform 120ms ease-out;
+}
+
+.archived-block[open] > summary svg {
+  transform: none;
+}
+
+.archived-block > summary:hover {
+  color: var(--text);
+}
+
+/* Menu "···" */
+.more {
+  position: relative;
+  flex: none;
+}
+
+.more > summary {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  list-style: none;
+  cursor: pointer;
+}
+
+.more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.more > summary::marker {
+  content: '';
+}
+
+.more > summary:hover,
+.more[open] > summary {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  box-shadow: var(--shadow-pop);
+}
+
+.more-menu button {
+  display: block;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.more-menu button:hover {
+  background: var(--hover);
+}
+
+.more-menu button.danger-item {
+  color: var(--danger);
+}
+
+.more-menu button.danger-item:hover {
+  background: var(--danger-soft);
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  border: 0;
+  background: var(--line);
+}
+
+/* Anexos: rodapé compacto do painel. */
+.attachments {
+  flex: none;
+  padding: 8px var(--pane-x) 10px;
+  border-top: 1px solid var(--line);
+  transition: background 120ms ease-out;
+}
+
+.attachments.is-empty {
+  opacity: 0.6;
+  transition: opacity 120ms ease-out;
+}
+
+.attachments.is-empty:hover,
+.attachments.is-empty:focus-within,
+.attachments.is-over {
+  opacity: 1;
+}
+
+.attachments.is-over {
+  background: var(--accent-soft);
+}
+
+.attachments header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 24px;
+}
+
+.attach-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px 0 4px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+}
+
+.attach-add:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.attachments ul {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachments li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  margin: 0 -6px;
+  padding: 0 4px 0 6px;
+  border-radius: var(--r-sm);
+}
+
+.attachments li:hover {
+  background: var(--hover);
+}
+
+.file-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+}
+
+.attachments .link {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachments .link:hover {
+  color: var(--accent-ink);
+}
+
+.attachments .size {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.attachments .remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.attachments li:hover .remove,
+.attachments .remove:focus-visible {
+  opacity: 1;
+}
+
+.attachments .remove:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}

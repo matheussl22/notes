@@ -97,7 +97,10 @@ describe('fluxo: projeto, nota, editor e anexo', () => {
     })
     assert.equal(projectFile.filename, 'contrato-origem.txt')
     assert.equal(projectFile.noteId, null)
-    assert.equal(readFileSync(attachmentPath(userData, projectFile.id), 'utf8'), 'contrato da clínica X')
+    assert.equal(
+      readFileSync(attachmentPath(userData, projectFile.id), 'utf8'),
+      'contrato da clínica X'
+    )
 
     const noteFile = storeDroppedFile(userData, {
       projectId: project.id,

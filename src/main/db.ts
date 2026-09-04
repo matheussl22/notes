@@ -21,11 +21,12 @@ type DbNote = {
   body_json: string
   body_text: string
   completed: number
+  position: number
   created_at: string
   updated_at: string
 }
 
-type DbAttachment = {
+export type DbAttachment = {
   id: number
   project_id: number
   note_id: number | null
@@ -33,6 +34,7 @@ type DbAttachment = {
   stored_name: string
   mime: string
   size: number
+  inline: number
   created_at: string
 }
 
@@ -59,6 +61,23 @@ export function closeDatabase(): void {
 
 function now(): string {
   return new Date().toISOString()
+}
+
+function hasColumn(table: string, column: string): boolean {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  return columns.some((item) => item.name === column)
+}
+
+function transaction<T>(work: () => T): T {
+  db.exec('BEGIN')
+  try {
+    const result = work()
+    db.exec('COMMIT')
+    return result
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
 }
 
 function migrate(): void {
@@ -136,15 +155,36 @@ function migrate(): void {
     END;
   `)
 
-  const columns = db.prepare('PRAGMA table_info(projects)').all() as { name: string }[]
-  if (!columns.some((column) => column.name === 'position')) {
+  if (!hasColumn('projects', 'position')) {
     db.exec('ALTER TABLE projects ADD COLUMN position INTEGER NOT NULL DEFAULT 0')
-    const existing = db
-      .prepare('SELECT id FROM projects ORDER BY name COLLATE NOCASE')
-      .all() as { id: number }[]
+    const existing = db.prepare('SELECT id FROM projects ORDER BY name COLLATE NOCASE').all() as {
+      id: number
+    }[]
     const update = db.prepare('UPDATE projects SET position = ? WHERE id = ?')
     existing.forEach((row, index) => update.run(index, row.id))
   }
+
+  if (!hasColumn('notes', 'position')) {
+    db.exec('ALTER TABLE notes ADD COLUMN position INTEGER NOT NULL DEFAULT 0')
+    // mantém a ordem que o usuário via antes: mais recente primeiro, dentro de cada projeto
+    const existing = db
+      .prepare('SELECT id, project_id FROM notes ORDER BY project_id, updated_at DESC')
+      .all() as { id: number; project_id: number }[]
+    const update = db.prepare('UPDATE notes SET position = ? WHERE id = ?')
+    const counters = new Map<number, number>()
+    for (const row of existing) {
+      const index = counters.get(row.project_id) ?? 0
+      update.run(index, row.id)
+      counters.set(row.project_id, index + 1)
+    }
+  }
+
+  if (!hasColumn('attachments', 'inline')) {
+    db.exec('ALTER TABLE attachments ADD COLUMN inline INTEGER NOT NULL DEFAULT 0')
+  }
+
+  db.exec('CREATE INDEX IF NOT EXISTS notes_project_position ON notes(project_id, position)')
+  db.exec('CREATE INDEX IF NOT EXISTS attachments_note ON attachments(note_id)')
 }
 
 function mapProject(row: DbProject): Project {
@@ -166,6 +206,7 @@ function mapNote(row: DbNote): Note {
     bodyJson: row.body_json,
     bodyText: row.body_text,
     completed: row.completed === 1,
+    position: row.position ?? 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   }
@@ -179,11 +220,18 @@ function mapAttachment(row: DbAttachment): Attachment {
     filename: row.filename,
     mime: row.mime,
     size: row.size,
+    inline: row.inline === 1,
     createdAt: row.created_at
   }
 }
 
-function upsertMemory(kind: string, refId: number, projectId: number, title: string, body: string): void {
+function upsertMemory(
+  kind: string,
+  refId: number,
+  projectId: number,
+  title: string,
+  body: string
+): void {
   db.prepare(
     `INSERT INTO memory_docs (kind, ref_id, project_id, title, body)
      VALUES (?, ?, ?, ?, ?)
@@ -207,9 +255,9 @@ function indexNote(note: Note): void {
 }
 
 function reindexNoteTasks(note: Note): void {
-  const oldTasks = db
-    .prepare('SELECT id FROM tasks WHERE note_id = ?')
-    .all(note.id) as { id: number }[]
+  const oldTasks = db.prepare('SELECT id FROM tasks WHERE note_id = ?').all(note.id) as {
+    id: number
+  }[]
   for (const task of oldTasks) deleteMemory('task', task.id)
   db.prepare('DELETE FROM tasks WHERE note_id = ?').run(note.id)
 
@@ -229,9 +277,9 @@ export function listTree(): ProjectTree[] {
     .all() as DbProject[]
   const notes = db
     .prepare(
-      'SELECT id, project_id, title, completed FROM notes ORDER BY completed ASC, updated_at DESC'
+      'SELECT id, project_id, title, completed, position FROM notes ORDER BY position ASC, updated_at DESC'
     )
-    .all() as Pick<DbNote, 'id' | 'project_id' | 'title' | 'completed'>[]
+    .all() as Pick<DbNote, 'id' | 'project_id' | 'title' | 'completed' | 'position'>[]
 
   return projects.map((project) => ({
     ...mapProject(project),
@@ -240,7 +288,8 @@ export function listTree(): ProjectTree[] {
       .map((note) => ({
         id: note.id,
         title: note.title,
-        completed: note.completed === 1
+        completed: note.completed === 1,
+        position: note.position
       }))
   }))
 }
@@ -255,82 +304,91 @@ export function createProject(name: string): Project {
       'INSERT INTO projects (name, description, position, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
     )
     .run(name.trim(), '', next, ts, ts)
-  const project = getProject(Number(result.lastInsertRowid))
+  const project = getProject(Number(result.lastInsertRowid))!
   indexProject(project)
   return project
 }
 
-export function getProject(id: number): Project {
-  const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as DbProject
-  return mapProject(row)
+export function getProject(id: number): Project | null {
+  const row = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as DbProject | undefined
+  return row ? mapProject(row) : null
 }
 
-export function updateProject(id: number, patch: { name?: string; description?: string }): Project {
+export function updateProject(
+  id: number,
+  patch: { name?: string; description?: string }
+): Project | null {
   const current = getProject(id)
+  if (!current) return null
   const ts = now()
+  const name = patch.name?.trim() || current.name
   db.prepare('UPDATE projects SET name = ?, description = ?, updated_at = ? WHERE id = ?').run(
-    patch.name ?? current.name,
+    name,
     patch.description ?? current.description,
     ts,
     id
   )
-  const project = getProject(id)
+  const project = getProject(id)!
   indexProject(project)
   return project
 }
 
 export function reorderProjects(ids: number[]): void {
   const update = db.prepare('UPDATE projects SET position = ? WHERE id = ?')
-  db.exec('BEGIN')
-  try {
+  transaction(() => {
     ids.forEach((id, index) => update.run(index, id))
-    db.exec('COMMIT')
-  } catch (error) {
-    db.exec('ROLLBACK')
-    throw error
-  }
+  })
 }
 
 export function deleteProject(id: number): void {
   const notes = db.prepare('SELECT id FROM notes WHERE project_id = ?').all(id) as { id: number }[]
-  const attachments = db
-    .prepare('SELECT id FROM attachments WHERE project_id = ?')
-    .all(id) as { id: number }[]
+  const attachments = db.prepare('SELECT id FROM attachments WHERE project_id = ?').all(id) as {
+    id: number
+  }[]
   const tasks = db.prepare('SELECT id FROM tasks WHERE project_id = ?').all(id) as { id: number }[]
 
-  db.prepare('DELETE FROM projects WHERE id = ?').run(id)
-  deleteMemory('project', id)
-  for (const note of notes) deleteMemory('note', note.id)
-  for (const attachment of attachments) deleteMemory('attachment', attachment.id)
-  for (const task of tasks) deleteMemory('task', task.id)
+  transaction(() => {
+    db.prepare('DELETE FROM projects WHERE id = ?').run(id)
+    deleteMemory('project', id)
+    for (const note of notes) deleteMemory('note', note.id)
+    for (const attachment of attachments) deleteMemory('attachment', attachment.id)
+    for (const task of tasks) deleteMemory('task', task.id)
+  })
 }
 
+/** Nova nota entra no topo do projeto (posição 0); as demais descem uma casa. */
 export function createNote(projectId: number, title: string): Note {
   const ts = now()
-  const result = db
-    .prepare(
-      `INSERT INTO notes (project_id, title, body_json, body_text, completed, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, ?, ?)`
-    )
-    .run(projectId, title.trim(), EMPTY_DOC, '', ts, ts)
-  const note = getNote(Number(result.lastInsertRowid))
+  const id = transaction(() => {
+    db.prepare('UPDATE notes SET position = position + 1 WHERE project_id = ?').run(projectId)
+    const result = db
+      .prepare(
+        `INSERT INTO notes (project_id, title, body_json, body_text, completed, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 0, ?, ?)`
+      )
+      .run(projectId, title.trim(), EMPTY_DOC, '', ts, ts)
+    return Number(result.lastInsertRowid)
+  })
+  const note = getNote(id)!
   indexNote(note)
   return note
 }
 
-export function getNote(id: number): Note {
-  const row = db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as DbNote
-  return mapNote(row)
+export function getNote(id: number): Note | null {
+  const row = db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as DbNote | undefined
+  return row ? mapNote(row) : null
 }
 
 export function updateNote(
   id: number,
   patch: { title?: string; bodyJson?: string; completed?: boolean }
-): Note {
+): Note | null {
   const current = getNote(id)
+  if (!current) return null
   const ts = now()
+  const bodyChanged = patch.bodyJson !== undefined && patch.bodyJson !== current.bodyJson
   const bodyJson = patch.bodyJson ?? current.bodyJson
-  const bodyText = patch.bodyJson ? extractPlainText(parseDoc(patch.bodyJson)) : current.bodyText
+  const bodyText = bodyChanged ? extractPlainText(parseDoc(bodyJson)) : current.bodyText
   const completed = patch.completed ?? current.completed
 
   db.prepare(
@@ -339,42 +397,68 @@ export function updateNote(
      WHERE id = ?`
   ).run(patch.title ?? current.title, bodyJson, bodyText, completed ? 1 : 0, ts, id)
 
-  const note = getNote(id)
+  const note = getNote(id)!
   indexNote(note)
-  if (patch.bodyJson !== undefined) reindexNoteTasks(note)
+  if (bodyChanged) reindexNoteTasks(note)
   return note
+}
+
+/**
+ * Reordena as notas de um projeto. `ids` é a ordem completa desejada; notas do
+ * projeto que não estiverem na lista vão para o fim mantendo a ordem atual.
+ */
+export function reorderNotes(projectId: number, ids: number[]): void {
+  const current = db
+    .prepare('SELECT id FROM notes WHERE project_id = ? ORDER BY position ASC, updated_at DESC')
+    .all(projectId) as { id: number }[]
+  const owned = new Set(current.map((row) => row.id))
+  const ordered = ids.filter((id, index) => owned.has(id) && ids.indexOf(id) === index)
+  const rest = current.map((row) => row.id).filter((id) => !ordered.includes(id))
+  const update = db.prepare('UPDATE notes SET position = ? WHERE id = ? AND project_id = ?')
+  transaction(() => {
+    ;[...ordered, ...rest].forEach((id, index) => update.run(index, id, projectId))
+  })
 }
 
 export function deleteNote(id: number): void {
   const tasks = db.prepare('SELECT id FROM tasks WHERE note_id = ?').all(id) as { id: number }[]
-  const attachments = db
-    .prepare('SELECT id FROM attachments WHERE note_id = ?')
-    .all(id) as { id: number }[]
-  db.prepare('DELETE FROM notes WHERE id = ?').run(id)
-  deleteMemory('note', id)
-  for (const task of tasks) deleteMemory('task', task.id)
-  for (const attachment of attachments) deleteMemory('attachment', attachment.id)
+  const attachments = db.prepare('SELECT id FROM attachments WHERE note_id = ?').all(id) as {
+    id: number
+  }[]
+  transaction(() => {
+    db.prepare('DELETE FROM notes WHERE id = ?').run(id)
+    deleteMemory('note', id)
+    for (const task of tasks) deleteMemory('task', task.id)
+    for (const attachment of attachments) deleteMemory('attachment', attachment.id)
+  })
 }
 
+/** Anexos visíveis (exclui imagens inline do corpo da nota). */
 export function listAttachments(projectId: number, noteId?: number | null): Attachment[] {
   const rows =
     noteId === undefined
       ? (db
-          .prepare('SELECT * FROM attachments WHERE project_id = ? ORDER BY created_at DESC')
+          .prepare(
+            'SELECT * FROM attachments WHERE project_id = ? AND inline = 0 ORDER BY created_at DESC'
+          )
           .all(projectId) as DbAttachment[])
       : noteId === null
         ? (db
             .prepare(
-              'SELECT * FROM attachments WHERE project_id = ? AND note_id IS NULL ORDER BY created_at DESC'
+              'SELECT * FROM attachments WHERE project_id = ? AND note_id IS NULL AND inline = 0 ORDER BY created_at DESC'
             )
             .all(projectId) as DbAttachment[])
         : (db
             .prepare(
-              'SELECT * FROM attachments WHERE project_id = ? AND note_id = ? ORDER BY created_at DESC'
+              'SELECT * FROM attachments WHERE project_id = ? AND note_id = ? AND inline = 0 ORDER BY created_at DESC'
             )
             .all(projectId, noteId) as DbAttachment[])
 
   return rows.map(mapAttachment)
+}
+
+export function attachmentRowsByNote(noteId: number): DbAttachment[] {
+  return db.prepare('SELECT * FROM attachments WHERE note_id = ?').all(noteId) as DbAttachment[]
 }
 
 export function addAttachment(input: {
@@ -384,43 +468,57 @@ export function addAttachment(input: {
   storedName: string
   mime: string
   size: number
+  inline?: boolean
 }): Attachment {
   const ts = now()
   const result = db
     .prepare(
-      `INSERT INTO attachments (project_id, note_id, filename, stored_name, mime, size, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO attachments (project_id, note_id, filename, stored_name, mime, size, inline, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .run(input.projectId, input.noteId, input.filename, input.storedName, input.mime, input.size, ts)
+    .run(
+      input.projectId,
+      input.noteId,
+      input.filename,
+      input.storedName,
+      input.mime,
+      input.size,
+      input.inline ? 1 : 0,
+      ts
+    )
   const row = db
     .prepare('SELECT * FROM attachments WHERE id = ?')
     .get(Number(result.lastInsertRowid)) as DbAttachment
-  upsertMemory('attachment', row.id, row.project_id, row.filename, row.filename)
+  if (!input.inline) upsertMemory('attachment', row.id, row.project_id, row.filename, row.filename)
   return mapAttachment(row)
 }
 
-export function getAttachmentRow(id: number): DbAttachment {
-  return db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as DbAttachment
+export function getAttachmentRow(id: number): DbAttachment | undefined {
+  return db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as DbAttachment | undefined
 }
 
 export function deleteAttachment(id: number): DbAttachment | undefined {
-  const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as DbAttachment | undefined
+  const row = getAttachmentRow(id)
   if (!row) return undefined
   db.prepare('DELETE FROM attachments WHERE id = ?').run(id)
   deleteMemory('attachment', id)
   return row
 }
 
+/**
+ * Busca full-text. Cada palavra vira um termo obrigatório; a última aceita prefixo,
+ * então "orç" já encontra "orçamento" enquanto o usuário digita.
+ */
 export function searchMemory(query: string): MemoryHit[] {
-  const trimmed = query.trim()
-  if (!trimmed) return []
-  const escaped = trimmed
+  const tokens = query
+    .trim()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .split(/\s+/)
     .filter(Boolean)
-    .map((token) => `"${token}"`)
+  if (tokens.length === 0) return []
+  const match = tokens
+    .map((token, index) => (index === tokens.length - 1 ? `"${token}"*` : `"${token}"`))
     .join(' AND ')
-  if (!escaped) return []
 
   const rows = db
     .prepare(
@@ -431,7 +529,7 @@ export function searchMemory(query: string): MemoryHit[] {
        ORDER BY rank
        LIMIT 40`
     )
-    .all(escaped) as {
+    .all(match) as {
     kind: MemoryHit['kind']
     ref_id: number
     project_id: number

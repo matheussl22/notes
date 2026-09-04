@@ -1,44 +1,59 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { MemoryHit, Note, Project, ProjectTree } from '../../shared/types'
-import { Attachments } from './components/Attachments'
-import { IconMore, IconPlus, IconSettings } from './components/Icons'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ProjectTree } from '../../shared/types'
+import { readStorage, useLatest, writeStorage } from './components/hooks'
 import { NameDialog } from './components/NameDialog'
-import { NoteEditor } from './components/NoteEditor'
 import { SettingsDialog } from './components/SettingsDialog'
-import { displayNoteTitle, isUntitledNote } from './i18n'
-import { useSettings } from './settings'
+import { Sidebar } from './components/Sidebar'
+import { WorkspaceView, type DropTarget, type PaneActions } from './components/Workspace'
+import { useSettings } from './settings-context'
+import {
+  closeOther,
+  closePane,
+  dropDeleted,
+  initialWorkspace,
+  MAX_PANES,
+  moveAside,
+  openInPane,
+  openInSplit,
+  parseWorkspace,
+  projectIdForNewNote,
+  pruneAgainstTree,
+  selectInActive,
+  serializeWorkspace,
+  setActive,
+  splitActive,
+  swapPanes,
+  WORKSPACE_KEY,
+  type Selection,
+  type Workspace
+} from './workspace'
 
-type Selection =
+type Dialog =
   | { kind: 'none' }
-  | { kind: 'project'; projectId: number }
-  | { kind: 'note'; projectId: number; noteId: number }
+  | { kind: 'project' }
+  | { kind: 'delete-project'; id: number; name: string }
+  | { kind: 'delete-note'; id: number; projectId: number }
+  | { kind: 'settings' }
 
-function closeMenu(event: React.MouseEvent<HTMLElement>): void {
-  event.currentTarget.closest('details')?.removeAttribute('open')
+function isBackslash(event: KeyboardEvent): boolean {
+  // ABNT2 e outros layouts mudam o `code`; a tecla em si é o que importa
+  return event.key === '\\' || event.key === '|' || event.code === 'Backslash'
 }
 
 export default function App(): React.JSX.Element {
   const [tree, setTree] = useState<ProjectTree[]>([])
-  const [selection, setSelection] = useState<Selection>({ kind: 'none' })
-  const [project, setProject] = useState<Project | null>(null)
-  const [note, setNote] = useState<Note | null>(null)
-  const [query, setQuery] = useState('')
-  const [hits, setHits] = useState<MemoryHit[]>([])
-  const [showArchived, setShowArchived] = useState(false)
-  const [draggingId, setDraggingId] = useState<number | null>(null)
-  const [dropId, setDropId] = useState<number | null>(null)
-  const [dialog, setDialog] = useState<
-    | { kind: 'none' }
-    | { kind: 'project' }
-    | { kind: 'delete-project'; id: number; name: string }
-    | { kind: 'delete-note'; id: number; projectId: number }
-    | { kind: 'settings' }
-  >({ kind: 'none' })
-
-  const { t, locale } = useSettings()
+  const [workspace, setWorkspace] = useState<Workspace>(
+    () => parseWorkspace(readStorage(WORKSPACE_KEY)) ?? initialWorkspace
+  )
+  const [dialog, setDialog] = useState<Dialog>({ kind: 'none' })
+  // null até sabermos; true no harness de screenshot (não persistir nada)
+  const [harness, setHarness] = useState<boolean | null>(null)
+  const { t } = useSettings()
 
   const reloadTree = useCallback(async () => {
-    setTree(await window.api.projects.tree())
+    const next = await window.api.projects.tree()
+    setTree(next)
+    setWorkspace((current) => pruneAgainstTree(current, next))
   }, [])
 
   useEffect(() => {
@@ -46,302 +61,183 @@ export default function App(): React.JSX.Element {
   }, [reloadTree])
 
   useEffect(() => {
-    if (selection.kind === 'none') {
-      setProject(null)
-      setNote(null)
-      return
-    }
-    void window.api.projects.get(selection.projectId).then(setProject)
-    if (selection.kind === 'note') {
-      void window.api.notes.get(selection.noteId).then(setNote)
-    } else {
-      setNote(null)
-    }
-  }, [selection])
+    if (harness === false) writeStorage(WORKSPACE_KEY, serializeWorkspace(workspace))
+  }, [workspace, harness])
 
+  // harness de screenshot: abre a cena pedida assim que a árvore chegar
   useEffect(() => {
-    const handle = window.setTimeout(async () => {
-      if (!query.trim()) {
-        setHits([])
-        return
+    let cancelled = false
+    void window.api.app.info().then(async (info) => {
+      if (cancelled) return
+      setHarness(Boolean(info.scene))
+      if (!info.scene) return
+      const loaded = await window.api.projects.tree()
+      if (cancelled) return
+      const first = loaded[0]
+      const notes = first?.notes.filter((note) => !note.completed) ?? []
+      const firstNote = notes[0]
+      const secondNote = notes[1]
+      const noteSel = (noteId: number): Selection =>
+        first ? { kind: 'note', projectId: first.id, noteId } : { kind: 'none' }
+      if (info.scene === 'note' && first && firstNote) {
+        setWorkspace(selectInActive(initialWorkspace, noteSel(firstNote.id)))
+      } else if (info.scene === 'project' && first) {
+        setWorkspace(selectInActive(initialWorkspace, { kind: 'project', projectId: first.id }))
+      } else if (info.scene === 'split' && first && firstNote) {
+        let next = selectInActive(initialWorkspace, noteSel(firstNote.id))
+        next = openInSplit(
+          next,
+          secondNote ? noteSel(secondNote.id) : { kind: 'project', projectId: first.id }
+        )
+        setWorkspace(next)
+      } else if (info.scene === 'split-project' && first && firstNote) {
+        // nota à esquerda, projeto dela à direita (o que "Dividir" faz)
+        setWorkspace(splitActive(selectInActive(initialWorkspace, noteSel(firstNote.id))))
+      } else if (info.scene === 'delete-dialog' && first && firstNote) {
+        setWorkspace(selectInActive(initialWorkspace, noteSel(firstNote.id)))
+        setDialog({ kind: 'delete-note', id: firstNote.id, projectId: first.id })
+      } else if (info.scene === 'settings') {
+        setDialog({ kind: 'settings' })
       }
-      setHits(await window.api.memory.search(query))
-    }, 180)
-    return () => window.clearTimeout(handle)
-  }, [query])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const select = useCallback((selection: Selection) => {
+    setWorkspace((current) => selectInActive(current, selection))
+  }, [])
 
   const createProject = async (name: string): Promise<void> => {
     const created = await window.api.projects.create(name)
     await reloadTree()
-    setSelection({ kind: 'project', projectId: created.id })
+    select({ kind: 'project', projectId: created.id })
     setDialog({ kind: 'none' })
   }
 
-  const moveProject = async (fromId: number, toId: number): Promise<void> => {
-    if (fromId === toId) return
-    const from = tree.findIndex((item) => item.id === fromId)
-    const to = tree.findIndex((item) => item.id === toId)
-    if (from < 0 || to < 0) return
-    const next = [...tree]
-    const [moved] = next.splice(from, 1)
-    next.splice(to, 0, moved)
-    setTree(next)
-    await window.api.projects.reorder(next.map((item) => item.id))
-  }
+  const createNote = useCallback(
+    async (projectId: number): Promise<void> => {
+      const created = await window.api.notes.create(projectId, '')
+      await reloadTree()
+      select({ kind: 'note', projectId, noteId: created.id })
+    },
+    [reloadTree, select]
+  )
 
-  const createNote = async (projectId: number, title: string): Promise<void> => {
-    const created = await window.api.notes.create(projectId, title)
-    await reloadTree()
-    setSelection({ kind: 'note', projectId, noteId: created.id })
-    setDialog({ kind: 'none' })
-  }
+  // atalhos globais; ignorados enquanto um diálogo está aberto
+  const latest = useLatest({ dialogOpen: dialog.kind !== 'none', workspace, tree })
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const { dialogOpen, workspace, tree } = latest.current
+      if (dialogOpen || event.altKey || !(event.ctrlKey || event.metaKey)) return
+      if (isBackslash(event)) {
+        event.preventDefault()
+        if (event.shiftKey) setWorkspace(swapPanes)
+        else setWorkspace((ws) => (ws.panes.length > 1 ? closeOther(ws) : splitActive(ws)))
+        return
+      }
+      if (event.shiftKey) return
+      if (event.code === 'Digit1' || event.code === 'Digit2') {
+        event.preventDefault()
+        setWorkspace((ws) => setActive(ws, event.code === 'Digit1' ? 0 : 1))
+        return
+      }
+      if (event.code === 'KeyN') {
+        event.preventDefault()
+        const projectId = projectIdForNewNote(workspace, tree)
+        if (projectId !== null) void createNote(projectId)
+        else setDialog({ kind: 'project' })
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [latest, createNote])
+
+  const reorderProjects = useCallback(
+    async (ids: number[]): Promise<void> => {
+      setTree((current) => {
+        const byId = new Map(current.map((item) => [item.id, item]))
+        return ids.map((id) => byId.get(id)).filter((item): item is ProjectTree => Boolean(item))
+      })
+      await window.api.projects.reorder(ids)
+      await reloadTree()
+    },
+    [reloadTree]
+  )
+
+  const reorderNotes = useCallback(
+    async (projectId: number, ids: number[]): Promise<void> => {
+      setTree((current) =>
+        current.map((item) => {
+          if (item.id !== projectId) return item
+          const byId = new Map(item.notes.map((note) => [note.id, note]))
+          const ordered = ids.map((id) => byId.get(id)).filter((note) => note !== undefined)
+          const rest = item.notes.filter((note) => !ids.includes(note.id))
+          return { ...item, notes: [...ordered, ...rest] }
+        })
+      )
+      await window.api.notes.reorder(projectId, ids)
+      await reloadTree()
+    },
+    [reloadTree]
+  )
+
+  const paneActions = useMemo(
+    () =>
+      (index: number): PaneActions => ({
+        onActivate: () => setWorkspace((current) => setActive(current, index)),
+        onClose: () => setWorkspace((current) => closePane(current, index)),
+        onSplit: () => setWorkspace((current) => splitActive(setActive(current, index))),
+        onSwap: () => setWorkspace(swapPanes),
+        onMoveAside: () => setWorkspace((current) => moveAside(current, index)),
+        canSplit: workspace.panes.length < MAX_PANES,
+        canClose: workspace.panes.length > 1,
+        canSwap: workspace.panes.length > 1,
+        onSelect: (selection) =>
+          setWorkspace((current) => selectInActive(setActive(current, index), selection)),
+        onOpenInSplit: (selection) =>
+          setWorkspace((current) => openInSplit(setActive(current, index), selection)),
+        onCreateNote: (projectId) => {
+          setWorkspace((current) => setActive(current, index))
+          void createNote(projectId)
+        },
+        onRequestDeleteProject: (project) =>
+          setDialog({ kind: 'delete-project', id: project.id, name: project.name }),
+        onRequestDeleteNote: (note) =>
+          setDialog({ kind: 'delete-note', id: note.id, projectId: note.projectId }),
+        onTreeChanged: () => void reloadTree(),
+        projectOf: (projectId) => tree.find((item) => item.id === projectId)
+      }),
+    [workspace.panes.length, createNote, reloadTree, tree]
+  )
+
+  const dropSelection = useCallback((target: DropTarget, selection: Selection) => {
+    setWorkspace((current) =>
+      target === 'split' ? openInSplit(current, selection) : openInPane(current, target, selection)
+    )
+  }, [])
 
   return (
     <div className="app">
-      <aside>
-        <div className="sidebar-head">
-          <strong>{t.appName}</strong>
-        </div>
-        <input
-          className="search"
-          value={query}
-          placeholder={t.search}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        {hits.length > 0 && (
-          <div className="hits">
-            {hits.map((hit) => (
-              <button
-                key={`${hit.kind}-${hit.refId}`}
-                type="button"
-                onClick={() => {
-                  if (hit.kind === 'note') {
-                    setSelection({ kind: 'note', projectId: hit.projectId, noteId: hit.refId })
-                  } else {
-                    setSelection({ kind: 'project', projectId: hit.projectId })
-                  }
-                  setQuery('')
-                  setHits([])
-                }}
-              >
-                <small>{hit.kind === 'note' ? t.note : t.project}</small>
-                <span>{hit.title || hit.body}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        <nav>
-          {tree.map((item) => {
-            const notes = item.notes.filter((entry) => showArchived || !entry.completed)
-            const archived = item.notes.filter((entry) => entry.completed).length
-            const projectActive = selection.kind !== 'none' && selection.projectId === item.id
-            return (
-              <div
-                key={item.id}
-                className={`project-block ${draggingId === item.id ? 'is-dragging' : ''} ${dropId === item.id && draggingId !== item.id ? 'is-drop' : ''} ${projectActive ? 'is-active' : ''}`}
-                onDragOver={(event) => {
-                  event.preventDefault()
-                  setDropId(item.id)
-                }}
-                onDragLeave={() => {
-                  setDropId((current) => (current === item.id ? null : current))
-                }}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  const fromId = Number(event.dataTransfer.getData('text/project-id'))
-                  setDraggingId(null)
-                  setDropId(null)
-                  if (Number.isFinite(fromId)) void moveProject(fromId, item.id)
-                }}
-              >
-                <div className="project-row">
-                  <button
-                    type="button"
-                    draggable
-                    className={`project ${selection.kind === 'project' && selection.projectId === item.id ? 'is-on' : ''}`}
-                    onClick={() => setSelection({ kind: 'project', projectId: item.id })}
-                    onDragStart={(event) => {
-                      event.dataTransfer.setData('text/project-id', String(item.id))
-                      event.dataTransfer.effectAllowed = 'move'
-                      setDraggingId(item.id)
-                    }}
-                    onDragEnd={() => {
-                      setDraggingId(null)
-                      setDropId(null)
-                    }}
-                  >
-                    {item.name}
-                  </button>
-                  <button
-                    type="button"
-                    className="add-note-icon"
-                    title={t.newNote}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      void createNote(item.id, '')
-                    }}
-                  >
-                    <IconPlus />
-                  </button>
-                </div>
-                {notes.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className={`note ${entry.completed ? 'is-done' : ''} ${isUntitledNote(entry.title) ? 'is-untitled' : ''} ${selection.kind === 'note' && selection.noteId === entry.id ? 'is-on' : ''}`}
-                    onClick={() =>
-                      setSelection({ kind: 'note', projectId: item.id, noteId: entry.id })
-                    }
-                  >
-                    {displayNoteTitle(entry.title, t)}
-                  </button>
-                ))}
-                {archived > 0 && projectActive && (
-                  <button
-                    type="button"
-                    className="ghost small"
-                    onClick={() => setShowArchived((value) => !value)}
-                  >
-                    {showArchived ? t.hideArchived : t.showArchived(archived)}
-                  </button>
-                )}
-              </div>
-            )
-          })}
-        </nav>
-        <div className="sidebar-foot-row">
-          <button type="button" className="sidebar-foot" onClick={() => setDialog({ kind: 'project' })}>
-            <IconPlus />
-            {t.project}
-          </button>
-          <button
-            type="button"
-            className="sidebar-gear"
-            title={t.settings}
-            onClick={() => setDialog({ kind: 'settings' })}
-          >
-            <IconSettings />
-          </button>
-        </div>
-      </aside>
+      <Sidebar
+        tree={tree}
+        workspace={workspace}
+        onSelect={select}
+        onOpenInSplit={(selection) => setWorkspace((current) => openInSplit(current, selection))}
+        onCreateProject={() => setDialog({ kind: 'project' })}
+        onCreateNote={(projectId) => void createNote(projectId)}
+        onOpenSettings={() => setDialog({ kind: 'settings' })}
+        onReorderProjects={(ids) => void reorderProjects(ids)}
+        onReorderNotes={(projectId, ids) => void reorderNotes(projectId, ids)}
+      />
 
-      <main>
-        {selection.kind === 'none' && (
-          <div className="empty-main">
-            <p className="empty-title">{t.emptyTitle}</p>
-            <p className="empty-hint">{t.emptyHint}</p>
-          </div>
-        )}
-
-        {selection.kind === 'project' && project && (
-          <div className="pane">
-            <div className="pane-head">
-              <input
-                className="title"
-                value={project.name}
-                onChange={(event) => setProject({ ...project, name: event.target.value })}
-                onBlur={() => void window.api.projects.update(project.id, { name: project.name }).then(reloadTree)}
-              />
-              <details className="more">
-                <summary title={t.more}>
-                  <IconMore />
-                </summary>
-                <div className="more-menu">
-                  <button
-                    type="button"
-                    className="danger-item"
-                    onClick={(event) => {
-                      closeMenu(event)
-                      setDialog({ kind: 'delete-project', id: project.id, name: project.name })
-                    }}
-                  >
-                    {t.delete}
-                  </button>
-                </div>
-              </details>
-            </div>
-            <textarea
-              className="description"
-              value={project.description}
-              placeholder={t.projectDescription}
-              onChange={(event) => setProject({ ...project, description: event.target.value })}
-              onBlur={() =>
-                void window.api.projects.update(project.id, { description: project.description })
-              }
-            />
-            <div className="row">
-              <button
-                type="button"
-                className="text-action"
-                onClick={() => void createNote(project.id, '')}
-              >
-                {t.newNote}
-              </button>
-            </div>
-            <Attachments projectId={project.id} noteId={null} />
-          </div>
-        )}
-
-        {selection.kind === 'note' && note && (
-          <div className="pane">
-            <div className="note-head">
-              <input
-                className="title"
-                value={note.title}
-                onChange={(event) => setNote({ ...note, title: event.target.value })}
-                onBlur={() => void window.api.notes.update(note.id, { title: note.title }).then(reloadTree)}
-              />
-              <details className="more">
-                <summary title={t.more}>
-                  <IconMore />
-                </summary>
-                <div className="more-menu">
-                  <button
-                    type="button"
-                    onClick={async (event) => {
-                      closeMenu(event)
-                      const updated = await window.api.notes.update(note.id, {
-                        completed: !note.completed
-                      })
-                      setNote(updated)
-                      await reloadTree()
-                    }}
-                  >
-                    {note.completed ? t.unarchive : t.archive}
-                  </button>
-                  <button
-                    type="button"
-                    className="danger-item"
-                    onClick={(event) => {
-                      closeMenu(event)
-                      setDialog({ kind: 'delete-note', id: note.id, projectId: note.projectId })
-                    }}
-                  >
-                    {t.delete}
-                  </button>
-                </div>
-              </details>
-            </div>
-            <NoteEditor
-              key={`${note.id}-${locale}`}
-              noteId={note.id}
-              initialJson={note.bodyJson}
-              placeholder={t.editorPlaceholder}
-              labels={{
-                bold: t.bold,
-                italic: t.italic,
-                heading: t.heading,
-                list: t.list,
-                checkbox: t.checkbox
-              }}
-              onChange={(bodyJson) => {
-                void window.api.notes.update(note.id, { bodyJson })
-              }}
-            />
-            <Attachments projectId={note.projectId} noteId={note.id} />
-          </div>
-        )}
-      </main>
+      <WorkspaceView
+        workspace={workspace}
+        paneActions={paneActions}
+        onDropSelection={dropSelection}
+        persist={harness === false}
+      />
 
       {dialog.kind === 'project' && (
         <NameDialog
@@ -364,7 +260,7 @@ export default function App(): React.JSX.Element {
           onCancel={() => setDialog({ kind: 'none' })}
           onConfirm={async () => {
             await window.api.projects.delete(dialog.id)
-            setSelection({ kind: 'none' })
+            setWorkspace((current) => dropDeleted(current, { projectId: dialog.id }))
             setDialog({ kind: 'none' })
             await reloadTree()
           }}
@@ -380,7 +276,7 @@ export default function App(): React.JSX.Element {
           onCancel={() => setDialog({ kind: 'none' })}
           onConfirm={async () => {
             await window.api.notes.delete(dialog.id)
-            setSelection({ kind: 'project', projectId: dialog.projectId })
+            setWorkspace((current) => dropDeleted(current, { noteId: dialog.id }))
             setDialog({ kind: 'none' })
             await reloadTree()
           }}

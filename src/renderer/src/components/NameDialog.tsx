@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 type Props = {
   title: string
   confirmLabel: string
+  /** texto do campo (modo nome) ou pergunta (modo confirmação) */
   placeholder?: string
   cancelLabel: string
   danger?: boolean
@@ -10,6 +11,10 @@ type Props = {
   onCancel: () => void
 }
 
+/**
+ * Diálogo modal para pedir um nome ou confirmar algo perigoso. Usa <dialog>
+ * nativo: Esc cancela, foco fica preso, clique no fundo cancela, Enter confirma.
+ */
 export function NameDialog({
   title,
   confirmLabel,
@@ -20,23 +25,35 @@ export function NameDialog({
   onCancel
 }: Props): React.JSX.Element {
   const [value, setValue] = useState('')
+  const dialogRef = useRef<HTMLDialogElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const confirmRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
-    inputRef.current?.focus()
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (!dialog.open) dialog.showModal()
+    ;(inputRef.current ?? confirmRef.current)?.focus()
+    return () => {
+      if (dialog.open) dialog.close()
+    }
   }, [])
 
   return (
-    <div
-      className="modal-backdrop"
-      onClick={onCancel}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') onCancel()
+    <dialog
+      ref={dialogRef}
+      className="modal"
+      onCancel={(event) => {
+        event.preventDefault()
+        onCancel()
+      }}
+      onClick={(event) => {
+        // o fundo é o próprio <dialog>; o conteúdo fica no <form>
+        if (event.target === event.currentTarget) onCancel()
       }}
     >
       <form
-        className="modal"
-        onClick={(event) => event.stopPropagation()}
+        className="modal-body"
         onSubmit={(event) => {
           event.preventDefault()
           const name = value.trim()
@@ -45,24 +62,30 @@ export function NameDialog({
         }}
       >
         <h2>{title}</h2>
-        {!danger && (
+        {danger ? (
+          <p>{placeholder}</p>
+        ) : (
           <input
             ref={inputRef}
             value={value}
             placeholder={placeholder}
+            spellCheck={false}
             onChange={(event) => setValue(event.target.value)}
           />
         )}
-        {danger && <p>{placeholder}</p>}
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button type="submit" className={danger ? 'primary danger' : 'primary'}>
+          <button
+            ref={confirmRef}
+            type="submit"
+            className={danger ? 'primary is-danger' : 'primary'}
+          >
             {confirmLabel}
           </button>
         </div>
       </form>
-    </div>
+    </dialog>
   )
 }

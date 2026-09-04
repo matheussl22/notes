@@ -1,3 +1,16 @@
+/**
+ * Textos da interface. Cada área do app tem seu próprio arquivo de mensagens
+ * para que possam evoluir de forma independente:
+ *
+ * - `i18n.ts`          — núcleo: shell, painéis, diálogos, configurações
+ * - `i18n.sidebar.ts`  — barra lateral (projetos, notas, busca)
+ * - `i18n.editor.ts`   — editor de texto (toolbar, menus, tabelas, imagens)
+ *
+ * `messages[locale]` junta tudo. Toda chave precisa existir nos três idiomas.
+ */
+import { editorMessages, type EditorMessages } from './i18n.editor'
+import { sidebarMessages, type SidebarMessages } from './i18n.sidebar'
+
 export type Locale = 'pt' | 'en' | 'es'
 
 export const locales: { id: Locale; label: string }[] = [
@@ -6,22 +19,22 @@ export const locales: { id: Locale; label: string }[] = [
   { id: 'es', label: 'Español' }
 ]
 
-export type Messages = {
+export type CoreMessages = {
   appName: string
-  search: string
   project: string
   note: string
   newNote: string
   untitled: string
   untitledProject: string
-  hideArchived: string
-  showArchived: (n: number) => string
-  emptyTitle: string
   emptyHint: string
+  /** atalhos mostrados no estado vazio */
+  shortcutSplit: string
+  shortcutNewNote: string
   more: string
   delete: string
   archive: string
   unarchive: string
+  archived: string
   newProject: string
   projectName: string
   create: string
@@ -38,34 +51,40 @@ export type Messages = {
   appearance: string
   language: string
   done: string
-  bold: string
-  italic: string
-  heading: string
-  list: string
-  checkbox: string
-  editorPlaceholder: string
+  /** painéis / split view */
+  split: string
+  closePane: string
+  swapPanes: string
+  openInSplit: string
+  openProject: string
+  notesCount: (n: number) => string
+  archivedCount: (n: number) => string
+  noNotes: string
+  notesLabel: string
+  resizeHint: string
 }
+
+export type Messages = CoreMessages & SidebarMessages & EditorMessages
 
 export const untitledNames = new Set(['', 'Sem título', 'Untitled', 'Sin título'])
 export const untitledProjects = new Set(['', 'Sem nome', 'Untitled', 'Sin nombre'])
 
-export const messages: Record<Locale, Messages> = {
+const core: Record<Locale, CoreMessages> = {
   pt: {
     appName: 'Notes',
-    search: 'Buscar',
     project: 'Projeto',
     note: 'nota',
     newNote: 'Nova nota',
     untitled: 'Sem título',
     untitledProject: 'Sem nome',
-    hideArchived: 'Ocultar arquivadas',
-    showArchived: (n) => `${n} arquivada(s)`,
-    emptyTitle: 'Nenhuma nota aberta',
-    emptyHint: 'Selecione uma nota à esquerda',
+    emptyHint: 'Escolha uma nota à esquerda ou crie uma nova.',
+    shortcutSplit: 'dividir a tela',
+    shortcutNewNote: 'nova nota',
     more: 'Mais',
     delete: 'Apagar',
     archive: 'Arquivar',
     unarchive: 'Desarquivar',
+    archived: 'Arquivada',
     newProject: 'Novo projeto',
     projectName: 'Nome do projeto',
     create: 'Criar',
@@ -82,29 +101,32 @@ export const messages: Record<Locale, Messages> = {
     appearance: 'Coloração',
     language: 'Idioma',
     done: 'Pronto',
-    bold: 'Negrito',
-    italic: 'Itálico',
-    heading: 'Título',
-    list: 'Lista',
-    checkbox: 'Checkbox',
-    editorPlaceholder: 'Escreva aqui. Use a barra para checkbox, título e lista.'
+    split: 'Dividir',
+    closePane: 'Fechar painel',
+    swapPanes: 'Trocar lados',
+    openInSplit: 'Abrir ao lado',
+    openProject: 'Abrir projeto',
+    notesCount: (n) => (n === 1 ? '1 nota' : `${n} notas`),
+    archivedCount: (n) => (n === 1 ? '1 arquivada' : `${n} arquivadas`),
+    noNotes: 'Nenhuma nota neste projeto.',
+    notesLabel: 'Notas',
+    resizeHint: 'Arraste para redimensionar. Duplo clique iguala os lados.'
   },
   en: {
     appName: 'Notes',
-    search: 'Search',
     project: 'Project',
     note: 'note',
     newNote: 'New note',
     untitled: 'Untitled',
     untitledProject: 'Untitled',
-    hideArchived: 'Hide archived',
-    showArchived: (n) => `${n} archived`,
-    emptyTitle: 'No note open',
-    emptyHint: 'Select a note on the left',
+    emptyHint: 'Pick a note on the left or create a new one.',
+    shortcutSplit: 'split the view',
+    shortcutNewNote: 'new note',
     more: 'More',
     delete: 'Delete',
     archive: 'Archive',
     unarchive: 'Unarchive',
+    archived: 'Archived',
     newProject: 'New project',
     projectName: 'Project name',
     create: 'Create',
@@ -121,29 +143,32 @@ export const messages: Record<Locale, Messages> = {
     appearance: 'Colors',
     language: 'Language',
     done: 'Done',
-    bold: 'Bold',
-    italic: 'Italic',
-    heading: 'Heading',
-    list: 'List',
-    checkbox: 'Checkbox',
-    editorPlaceholder: 'Write here. Use the toolbar for checkbox, heading, and list.'
+    split: 'Split',
+    closePane: 'Close pane',
+    swapPanes: 'Swap sides',
+    openInSplit: 'Open to the side',
+    openProject: 'Open project',
+    notesCount: (n) => (n === 1 ? '1 note' : `${n} notes`),
+    archivedCount: (n) => (n === 1 ? '1 archived' : `${n} archived`),
+    noNotes: 'No notes in this project.',
+    notesLabel: 'Notes',
+    resizeHint: 'Drag to resize. Double-click to even out.'
   },
   es: {
     appName: 'Notes',
-    search: 'Buscar',
     project: 'Proyecto',
     note: 'nota',
     newNote: 'Nueva nota',
     untitled: 'Sin título',
     untitledProject: 'Sin nombre',
-    hideArchived: 'Ocultar archivadas',
-    showArchived: (n) => `${n} archivada(s)`,
-    emptyTitle: 'Ninguna nota abierta',
-    emptyHint: 'Selecciona una nota a la izquierda',
+    emptyHint: 'Elige una nota a la izquierda o crea una nueva.',
+    shortcutSplit: 'dividir la pantalla',
+    shortcutNewNote: 'nueva nota',
     more: 'Más',
     delete: 'Eliminar',
     archive: 'Archivar',
     unarchive: 'Desarchivar',
+    archived: 'Archivada',
     newProject: 'Nuevo proyecto',
     projectName: 'Nombre del proyecto',
     create: 'Crear',
@@ -160,16 +185,26 @@ export const messages: Record<Locale, Messages> = {
     appearance: 'Color',
     language: 'Idioma',
     done: 'Listo',
-    bold: 'Negrita',
-    italic: 'Cursiva',
-    heading: 'Título',
-    list: 'Lista',
-    checkbox: 'Casilla',
-    editorPlaceholder: 'Escribe aquí. Usa la barra para casilla, título y lista.'
+    split: 'Dividir',
+    closePane: 'Cerrar panel',
+    swapPanes: 'Intercambiar lados',
+    openInSplit: 'Abrir al lado',
+    openProject: 'Abrir proyecto',
+    notesCount: (n) => (n === 1 ? '1 nota' : `${n} notas`),
+    archivedCount: (n) => (n === 1 ? '1 archivada' : `${n} archivadas`),
+    noNotes: 'Ninguna nota en este proyecto.',
+    notesLabel: 'Notas',
+    resizeHint: 'Arrastra para redimensionar. Doble clic iguala los lados.'
   }
 }
 
-export function displayNoteTitle(title: string, t: Messages): string {
+export const messages: Record<Locale, Messages> = {
+  pt: { ...core.pt, ...sidebarMessages.pt, ...editorMessages.pt },
+  en: { ...core.en, ...sidebarMessages.en, ...editorMessages.en },
+  es: { ...core.es, ...sidebarMessages.es, ...editorMessages.es }
+}
+
+export function displayNoteTitle(title: string, t: Pick<Messages, 'untitled'>): string {
   return untitledNames.has(title.trim()) ? t.untitled : title
 }
 

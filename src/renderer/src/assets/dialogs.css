@@ -1,0 +1,227 @@
+/* Diálogos modais (<dialog> nativo): nome/confirmação e configurações. */
+.modal {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  margin: auto;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-pop);
+}
+
+.modal::backdrop {
+  background: var(--overlay);
+}
+
+/* o fundo clicável é o próprio <dialog>; o conteúdo tem o padding */
+.modal-body {
+  padding: 24px;
+}
+
+.modal h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.modal input,
+.modal p {
+  width: 100%;
+  margin: 0 0 20px;
+}
+
+.modal p {
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.modal input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.modal input:focus {
+  border-color: var(--accent);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.modal-actions .ghost {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+}
+
+.modal-actions .ghost:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.primary {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.primary:hover {
+  background: var(--accent-ink);
+}
+
+.primary.is-danger {
+  background: var(--danger);
+}
+
+.primary.is-danger:hover {
+  background: var(--danger-ink);
+}
+
+/* Configurações */
+.settings-modal {
+  width: min(440px, calc(100% - 32px));
+}
+
+.settings-modal h3 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.settings-block {
+  margin-bottom: 20px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-soft);
+  transition:
+    background 120ms ease-out,
+    border-color 120ms ease-out;
+}
+
+.theme-card:hover {
+  background: var(--hover);
+}
+
+.theme-card.is-on {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.theme-name {
+  font-size: 12px;
+}
+
+/* miniatura 56×36: sidebar à esquerda, painel com duas linhas de texto */
+.theme-thumb {
+  position: relative;
+  display: block;
+  width: 56px;
+  height: 36px;
+  border: 1px solid;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+}
+
+.theme-thumb i {
+  display: block;
+}
+
+.thumb-side {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 17px;
+  border-right: 1px solid;
+}
+
+.thumb-sel {
+  position: absolute;
+  top: 8px;
+  left: 4px;
+  width: 9px;
+  height: 2px;
+  border-radius: 1px;
+  opacity: 0.9;
+}
+
+.thumb-line {
+  position: absolute;
+  left: 24px;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.thumb-line:not(.is-short) {
+  top: 9px;
+  width: 22px;
+}
+
+.thumb-line.is-short {
+  top: 15px;
+  width: 14px;
+}
+
+/* controle segmentado (idioma) */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--field);
+}
+
+.segmented button {
+  height: 26px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background 120ms ease-out,
+    color 120ms ease-out;
+}
+
+.segmented button:hover {
+  color: var(--text);
+}
+
+.segmented button.is-on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}

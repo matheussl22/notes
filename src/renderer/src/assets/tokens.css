@@ -1,0 +1,180 @@
+/*
+ * Tokens de design: cores por tema, raios, sombras, tipografia base e reset.
+ * Todo CSS do app usa só estas variáveis. Ver docs/design.md.
+ */
+:root {
+  color-scheme: light;
+  --bg: #f5f4f1;
+  --sidebar: #f5f4f1;
+  --panel: #ffffff;
+  --line: #e6e3dd;
+  --line-strong: #d4d0c8;
+  --text: #1c1b19;
+  --text-soft: #413e38;
+  --muted: #726f67;
+  --accent: #14665c;
+  --accent-ink: #0f4f47;
+  --accent-soft: #e6efec;
+  /* texto sobre --accent / --danger sólidos (botão primário) */
+  --on-accent: #ffffff;
+  --danger: #b3261e;
+  --danger-ink: #8f1e18;
+  --danger-soft: #fbeceb;
+  --sel: #ddd8ce;
+  --hover: #eeebe4;
+  --field: #ebe8e2;
+  --code-bg: #f0eee9;
+  --highlight: #fff1a8;
+  --table-sel: rgba(20, 102, 92, 0.12);
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 12px;
+  --shadow-pop: 0 1px 2px rgba(28, 27, 25, 0.06), 0 12px 28px -10px rgba(28, 27, 25, 0.22);
+  --overlay: rgba(28, 27, 25, 0.3);
+  --sidebar-w: 240px;
+  /* respiro horizontal do painel; encolhe no split (layout.css) */
+  --pane-x: 28px;
+  --font-ui:
+    'Segoe UI Variable Text', 'Segoe UI', 'SF Pro Text', 'Cantarell', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-family: var(--font-ui);
+}
+
+:root[data-theme='ink'] {
+  --bg: #f3f5f7;
+  --sidebar: #eef1f4;
+  --panel: #ffffff;
+  --line: #d8dee6;
+  --line-strong: #c4ccd6;
+  --text: #1a1d21;
+  --text-soft: #3b424b;
+  --muted: #616b77;
+  --accent: #1f4e79;
+  --accent-ink: #163a5a;
+  --accent-soft: #e4eef6;
+  --sel: #d5dde6;
+  --hover: #e6ebf0;
+  --field: #e3e8ee;
+  --code-bg: #eef1f5;
+  --highlight: #fdf0a6;
+  --table-sel: rgba(31, 78, 121, 0.12);
+}
+
+:root[data-theme='sand'] {
+  --bg: #f6efe4;
+  --sidebar: #f3e8d6;
+  --panel: #fffaf2;
+  --line: #e4d3b8;
+  --line-strong: #d2bc98;
+  --text: #2a2118;
+  --text-soft: #4a3d2e;
+  --muted: #73634e;
+  --accent: #9a4b1f;
+  --accent-ink: #7a3a16;
+  --accent-soft: #f4e4d4;
+  --sel: #e8d5b6;
+  --hover: #efe2cc;
+  --field: #ecdfc9;
+  --code-bg: #f3eadb;
+  --highlight: #ffe9a3;
+  --table-sel: rgba(154, 75, 31, 0.12);
+}
+
+:root[data-theme='night'] {
+  color-scheme: dark;
+  --bg: #161513;
+  --sidebar: #1c1b18;
+  --panel: #1f1e1b;
+  --line: #2f2d28;
+  --line-strong: #45423b;
+  --text: #eceae4;
+  --text-soft: #cfcbc2;
+  --muted: #9a958a;
+  --accent: #7dbaad;
+  --accent-ink: #b6ddd5;
+  --accent-soft: #243833;
+  --on-accent: #161513;
+  --danger: #e06b66;
+  --danger-ink: #eb8a86;
+  --danger-soft: #3a2221;
+  --sel: #2a2824;
+  --hover: #26241f;
+  --field: #26241f;
+  --code-bg: #232219;
+  --highlight: #5a4d12;
+  --table-sel: rgba(125, 186, 173, 0.18);
+  --overlay: rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 28px -10px rgba(0, 0, 0, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  color: var(--text);
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Foco visível só por teclado; clique de mouse nunca desenha anel. */
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.title:focus-visible,
+.description:focus-visible,
+.doc:focus-visible {
+  outline: none;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+  cursor: pointer;
+}
+
+::selection {
+  background: var(--sel);
+}
+
+/* Barras de rolagem finas e discretas em todo o app. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-color: var(--line-strong);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

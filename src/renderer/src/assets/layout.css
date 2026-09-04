@@ -1,0 +1,181 @@
+/* Casca do app: grade sidebar + área de trabalho, painéis (split), divisor, estado vazio. */
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  height: 100%;
+}
+
+.workspace {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.workspace.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.workspace.is-resizing .pane-slot {
+  pointer-events: none;
+}
+
+.pane-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace.is-split {
+  --pane-x: 20px;
+}
+
+/* 320px é o mínimo confortável; abaixo disso os dois lados dividem o que há */
+.workspace.is-split .pane-slot {
+  min-width: min(320px, calc(50% - 1px));
+}
+
+/* Painel inativo: cabeçalho um pouco mais quieto (ícones da toolbar a 60%, abaixo). */
+.workspace.is-split .pane-slot:not(.is-active) .pane-top {
+  opacity: 0.75;
+}
+
+/* Divisor entre os slots: 1px no layout, alça de 5px por cima (SplitDivider.tsx). */
+.split-divider {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  width: 1px;
+  background: var(--line);
+  transition: background 120ms ease-out;
+}
+
+.split-divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -2px;
+  width: 5px;
+  cursor: col-resize;
+}
+
+.split-divider:hover,
+.workspace.is-resizing .split-divider {
+  background: var(--line-strong);
+}
+
+/* Zona de soltura de uma nota arrastada da sidebar. */
+.drop-hint {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  background: var(--accent-soft);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Toolbar do painel: dividir / trocar / fechar. Vive na linha do título. */
+.pane-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+}
+
+.pane-tool {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--muted);
+  transition:
+    opacity 120ms ease-out,
+    background 120ms ease-out;
+}
+
+.workspace.is-split .pane-slot:not(.is-active) .pane-tool {
+  opacity: 0.6;
+}
+
+.pane-tool:hover,
+.pane-tool:focus-visible {
+  opacity: 1;
+  background: var(--hover);
+  color: var(--text);
+}
+
+.pane-tool svg {
+  display: block;
+}
+
+/* Sem título no painel vazio: a toolbar fica no canto. */
+.pane-float {
+  position: absolute;
+  top: 12px;
+  right: calc(var(--pane-x) - 4px);
+}
+
+.empty-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.empty-main p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.empty-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.empty-keys li {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.empty-keys span {
+  margin-left: 4px;
+}
+
+.empty-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-soft);
+}

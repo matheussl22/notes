@@ -1,36 +1,32 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { messages, type Locale, type Messages } from './i18n'
-import { applyTheme, type ThemeId } from './theme'
+import { useEffect, useMemo, useState } from 'react'
+import { messages } from './i18n'
+import { SettingsContext, type SettingsValue, type Stored } from './settings-context'
+import { applyTheme } from './theme'
 
 const KEY = 'notes.settings'
 
-type Stored = {
-  locale: Locale
-  theme: ThemeId
+function normalize(input: Partial<Record<keyof Stored, string | null | undefined>>): Stored {
+  return {
+    locale: input.locale === 'en' || input.locale === 'es' ? input.locale : 'pt',
+    theme:
+      input.theme === 'ink' || input.theme === 'night' || input.theme === 'sand'
+        ? input.theme
+        : 'paper'
+  }
 }
-
-type SettingsValue = Stored & {
-  t: Messages
-  setLocale: (locale: Locale) => void
-  setTheme: (theme: ThemeId) => void
-}
-
-const SettingsContext = createContext<SettingsValue | null>(null)
 
 function readStored(): Stored {
+  // harness de screenshot: ?theme=night&locale=en vence o que estiver salvo
+  const params = new URLSearchParams(window.location.search)
+  if (params.has('theme') || params.has('locale')) {
+    return normalize({ theme: params.get('theme'), locale: params.get('locale') })
+  }
   try {
     const raw = localStorage.getItem(KEY)
-    if (!raw) return { locale: 'pt', theme: 'paper' }
-    const parsed = JSON.parse(raw) as Partial<Stored>
-    return {
-      locale: parsed.locale === 'en' || parsed.locale === 'es' ? parsed.locale : 'pt',
-      theme:
-        parsed.theme === 'ink' || parsed.theme === 'night' || parsed.theme === 'sand'
-          ? parsed.theme
-          : 'paper'
-    }
+    if (!raw) return normalize({})
+    return normalize(JSON.parse(raw) as Partial<Stored>)
   } catch {
-    return { locale: 'pt', theme: 'paper' }
+    return normalize({})
   }
 }
 
@@ -54,12 +50,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }): R
   )
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
-}
-
-export function useSettings(): SettingsValue {
-  const value = useContext(SettingsContext)
-  if (!value) throw new Error('SettingsProvider ausente')
-  return value
 }
 
 applyTheme(readStored().theme)
