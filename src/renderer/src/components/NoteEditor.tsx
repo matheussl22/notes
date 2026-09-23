@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, ReactNodeViewRenderer, useEditor } from '@tiptap/react'
 import { Extension, getSchema, type Editor } from '@tiptap/core'
+import type { Node as PmNode } from '@tiptap/pm/model'
 import { CodeBlockView } from '../editor/CodeBlockView'
 import { parseJson, sanitizeDoc } from '../editor/document'
 import { ImageView } from '../editor/ImageView'
@@ -26,12 +27,14 @@ type Props = {
 const SAVE_DELAY = 350
 
 /** Orquestra o Tiptap: extensões, menus, imagens e salvamento com debounce. */
-export function NoteEditor({ noteId, projectId, initialJson, onChange }: Props): React.JSX.Element {
+function NoteEditorImpl({ noteId, projectId, initialJson, onChange }: Props): React.JSX.Element {
   const { t, locale } = useSettings()
   const root = useRef<HTMLDivElement>(null)
   const saveTimer = useRef<number>(0)
-  // último JSON ainda não gravado; null quando não há nada pendente
-  const pending = useRef<string | null>(null)
+  // último documento ainda não gravado; null quando não há nada pendente.
+  // Guardamos o nó (imutável) e só serializamos ao gravar: JSON.stringify do
+  // documento inteiro a cada tecla trava notas grandes.
+  const pending = useRef<PmNode | null>(null)
   // instância do editor para handlers criados antes dele existir (paste/drop/slash)
   const editorRef = useRef<Editor | null>(null)
   const [link, setLink] = useState<LinkTarget | null>(null)
@@ -109,12 +112,12 @@ export function NoteEditor({ noteId, projectId, initialJson, onChange }: Props):
       }
     },
     onUpdate: ({ editor: current }) => {
-      const json = JSON.stringify(current.getJSON())
-      pending.current = json
+      pending.current = current.state.doc
       window.clearTimeout(saveTimer.current)
       saveTimer.current = window.setTimeout(() => {
+        const doc = pending.current
         pending.current = null
-        onChange(json)
+        if (doc) onChange(JSON.stringify(doc.toJSON()))
       }, SAVE_DELAY)
     }
   })
@@ -124,7 +127,7 @@ export function NoteEditor({ noteId, projectId, initialJson, onChange }: Props):
     return () => {
       window.clearTimeout(saveTimer.current)
       if (pending.current !== null) {
-        onChange(pending.current)
+        onChange(JSON.stringify(pending.current.toJSON()))
         pending.current = null
       }
     }
@@ -146,3 +149,15 @@ export function NoteEditor({ noteId, projectId, initialJson, onChange }: Props):
     </div>
   )
 }
+
+/**
+ * `initialJson` só vale na montagem; o painel o atualiza a cada gravação (para
+ * remontagens por troca de idioma), e isso não deve re-renderizar o editor.
+ */
+export const NoteEditor = memo(
+  NoteEditorImpl,
+  (prev, next) =>
+    prev.noteId === next.noteId &&
+    prev.projectId === next.projectId &&
+    prev.onChange === next.onChange
+)

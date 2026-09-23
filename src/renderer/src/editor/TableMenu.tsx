@@ -14,12 +14,19 @@ export function TableMenu({ editor }: Props): React.JSX.Element {
   const { t } = useSettings()
   const s = useEditorState({
     editor,
-    selector: ({ editor: e }) => ({
-      inTable: e.isActive('table'),
-      canMerge: e.can().mergeCells(),
-      canSplit: e.can().splitCell(),
-      multi: e.state.selection instanceof CellSelection && e.state.selection.ranges.length > 1
-    })
+    // fora de tabela não roda os dry-runs (`can()`) a cada transação
+    selector: ({ editor: e }) => {
+      const inTable = e.isActive('table')
+      return {
+        inTable,
+        canMerge: inTable && e.can().mergeCells(),
+        canSplit: inTable && e.can().splitCell(),
+        multi:
+          inTable &&
+          e.state.selection instanceof CellSelection &&
+          e.state.selection.ranges.length > 1
+      }
+    }
   })
 
   const run =

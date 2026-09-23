@@ -200,6 +200,37 @@ describe('leituras e updates', () => {
     assert.equal(getNote(note.id).bodyText, 'fazer')
   })
 
+  it('corpo muda fora das tarefas: tarefas preservadas; mudam: reindexadas', () => {
+    const project = createProject('P')
+    const note = createNote(project.id, 'N')
+    const doc = (extra, checked = false) =>
+      JSON.stringify({
+        type: 'doc',
+        content: [
+          {
+            type: 'taskList',
+            content: [
+              {
+                type: 'taskItem',
+                attrs: { checked },
+                content: [{ type: 'paragraph', content: [{ type: 'text', text: 'fazer' }] }]
+              }
+            ]
+          },
+          { type: 'paragraph', content: [{ type: 'text', text: extra }] }
+        ]
+      })
+    const taskRows = () =>
+      getDb().prepare('SELECT id, done FROM tasks WHERE note_id = ?').all(note.id)
+    updateNote(note.id, { bodyJson: doc('a') })
+    const first = taskRows()
+    updateNote(note.id, { bodyJson: doc('ab') })
+    assert.deepEqual(taskRows(), first, 'digitar fora da lista não recria tarefas')
+    assert.equal(getNote(note.id).bodyText, 'fazer ab')
+    updateNote(note.id, { bodyJson: doc('ab', true) })
+    assert.equal(taskRows()[0].done, 1, 'marcar a tarefa reindexa')
+  })
+
   it('body vazio (string vazia) ainda é tratado como mudança de corpo', () => {
     const project = createProject('P')
     const note = createNote(project.id, 'N')

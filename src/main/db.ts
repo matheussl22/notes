@@ -44,6 +44,8 @@ export function openDatabase(userData: string): DatabaseSync {
   mkdirSync(userData, { recursive: true })
   db = new DatabaseSync(join(userData, 'notes.db'))
   db.exec('PRAGMA journal_mode = WAL')
+  // com WAL, NORMAL continua seguro contra corrupção e evita um fsync por gravação
+  db.exec('PRAGMA synchronous = NORMAL')
   db.exec('PRAGMA foreign_keys = ON')
   migrate()
   return db
@@ -254,14 +256,25 @@ function indexNote(note: Note): void {
   upsertMemory('note', note.id, note.projectId, note.title, note.bodyText)
 }
 
-function reindexNoteTasks(note: Note): void {
-  const oldTasks = db.prepare('SELECT id FROM tasks WHERE note_id = ?').all(note.id) as {
-    id: number
-  }[]
+/** `titleChanged`: as linhas de memória das tarefas carregam o título da nota. */
+function reindexNoteTasks(note: Note, titleChanged = false): void {
+  const tasks = extractTasks(parseDoc(note.bodyJson))
+  const oldTasks = db
+    .prepare('SELECT id, text, done FROM tasks WHERE note_id = ? ORDER BY position')
+    .all(note.id) as { id: number; text: string; done: number }[]
+  // salvamento com debounce reenvia o corpo a cada pausa na digitação; se as
+  // tarefas não mudaram, não mexer nas linhas (nem no índice FTS)
+  const same =
+    oldTasks.length === tasks.length &&
+    oldTasks.every((old, index) => {
+      const task = tasks[index]
+      return old.text === task.text && old.done === (task.done ? 1 : 0)
+    })
+  if (same && !titleChanged) return
+
   for (const task of oldTasks) deleteMemory('task', task.id)
   db.prepare('DELETE FROM tasks WHERE note_id = ?').run(note.id)
 
-  const tasks = extractTasks(parseDoc(note.bodyJson))
   const insert = db.prepare(
     'INSERT INTO tasks (project_id, note_id, text, done, position) VALUES (?, ?, ?, ?, ?)'
   )
@@ -389,17 +402,21 @@ export function updateNote(
   const bodyChanged = patch.bodyJson !== undefined && patch.bodyJson !== current.bodyJson
   const bodyJson = patch.bodyJson ?? current.bodyJson
   const bodyText = bodyChanged ? extractPlainText(parseDoc(bodyJson)) : current.bodyText
+  const title = patch.title ?? current.title
   const completed = patch.completed ?? current.completed
+  const note: Note = { ...current, title, bodyJson, bodyText, completed, updatedAt: ts }
 
-  db.prepare(
-    `UPDATE notes
-     SET title = ?, body_json = ?, body_text = ?, completed = ?, updated_at = ?
-     WHERE id = ?`
-  ).run(patch.title ?? current.title, bodyJson, bodyText, completed ? 1 : 0, ts, id)
+  // uma transação só: um commit no lugar de um por UPDATE/INSERT (inclusive FTS)
+  transaction(() => {
+    db.prepare(
+      `UPDATE notes
+       SET title = ?, body_json = ?, body_text = ?, completed = ?, updated_at = ?
+       WHERE id = ?`
+    ).run(title, bodyJson, bodyText, completed ? 1 : 0, ts, id)
 
-  const note = getNote(id)!
-  indexNote(note)
-  if (bodyChanged) reindexNoteTasks(note)
+    if (title !== current.title || bodyText !== current.bodyText) indexNote(note)
+    if (bodyChanged) reindexNoteTasks(note, title !== current.title)
+  })
   return note
 }
 
